@@ -1,39 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Online IDE - VS Code Style</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Online IDE - Professional</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: #1e1e1e; font-family: "Segoe UI", sans-serif; color: #ccc; }
-
-    .container { display: flex; height: 100vh; }
-    .sidebar { width: 150px; background: #252526; display: flex; flex-direction: column; padding: 10px; }
-    .sidebar button {
-      background: none; border: none; color: #ccc; padding: 10px; text-align: left; cursor: pointer; border-radius: 4px;
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
-    .sidebar button.active { background: #3c3c3c; }
 
-    .editor-section { flex: 1; display: flex; flex-direction: column; background: #1e1e1e; }
-    .tabs { display: flex; background: #2d2d2d; }
+    html,
+    body {
+      height: 100%;
+      background: #1e1e1e;
+      font-family: 'Fira Code', monospace;
+      color: #ccc;
+      overflow: hidden;
+    }
+
+    .navbar {
+      height: 60px;
+      background: #007acc;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      font-weight: bold;
+      font-size: 20px;
+    }
+
+    .navbar button {
+      background: #fff;
+      color: #007acc;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+
+    .navbar button:hover {
+      background: #e0e0e0;
+    }
+
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      height: calc(100vh - 60px);
+    }
+
+    .sidebar {
+      width: 250px;
+      background: #252526;
+      overflow-y: auto;
+      padding: 10px;
+      border-right: 1px solid #333;
+    }
+
+    .tree {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .tree li {
+      padding: 8px;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+      border-radius: 5px;
+      transition: background 0.2s;
+    }
+
+    .tree li:hover {
+      background: #333;
+    }
+
+    .tree li.folder>span::before {
+      content: '▶';
+      display: inline-block;
+      margin-right: 5px;
+      transform: rotate(0deg);
+      transition: .2s;
+    }
+
+    .tree li.folder.open>span::before {
+      transform: rotate(90deg);
+    }
+
+    .tree ul {
+      display: none;
+      padding-left: 15px;
+    }
+
+    .tree li.open>ul {
+      display: block;
+    }
+
+    .tree li span {
+      display: inline-block;
+      width: 100%;
+    }
+
+    .editor-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #1e1e1e;
+      min-width: 300px;
+    }
+
+    .tabs {
+      display: flex;
+      background: #2d2d2d;
+    }
+
     .tabs button {
-      background: none; border: none; color: #ccc; padding: 10px 15px; cursor: pointer; border-bottom: 2px solid transparent;
+      background: none;
+      border: none;
+      color: #ccc;
+      padding: 10px 15px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
     }
-    .tabs button.active { border-bottom: 2px solid #007acc; background: #1e1e1e; }
 
-    .editor { flex: 1; }
-    .preview { flex: 1; border: none; }
+    .tabs button.active {
+      border-bottom: 2px solid #007acc;
+      background: #1e1e1e;
+    }
 
-    .right-pane { display: flex; flex-direction: column; flex: 1; }
+    .editor {
+      flex: 1;
+      min-height: 250px;
+    }
+
+    .right-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 300px;
+    }
+
+    .preview {
+      flex: 1;
+      border: none;
+      background: #fff;
+      min-height: 250px;
+    }
+
+    @media(max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #333;
+      }
+    }
   </style>
 </head>
+
 <body>
+  <div class="navbar">
+    ⚡ My Professional IDE
+    <button onclick="saveProject()">💾 Save Project</button>
+  </div>
   <div class="container">
     <div class="sidebar">
-      <button onclick="openFile('index.html')" id="btn-index.html">index.html</button>
-      <button onclick="openFile('style.css')" id="btn-style.css">style.css</button>
-      <button onclick="openFile('script.js')" id="btn-script.js">script.js</button>
+      <ul class="tree" id="fileTree"></ul>
     </div>
 
     <div class="editor-section">
@@ -46,39 +186,72 @@
     </div>
   </div>
 
-  <!-- Monaco CDN -->
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs/loader.js"></script>
-
   <script>
-    // Setup Monaco loader
-    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs' } });
-
+    const treeData = [
+      { name: "index.html", type: "file" },
+      { name: "style.css", type: "file" },
+      { name: "script.js", type: "file" }
+    ];
     const files = {
       "index.html": { content: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Live Preview</title>\n</head>\n<body>\n  <h1>Hello World</h1>\n  <p>Edit files to see live preview!</p>\n</body>\n</html>", language: "html" },
       "style.css": { content: "body { background: #f0f0f0; color: #333; font-family: Arial; } h1 { color: steelblue; }", language: "css" },
       "script.js": { content: "document.querySelector('h1').addEventListener('click', () => alert('Hello from JS!'))", language: "javascript" }
     };
+    let editor, currentFile = null;
 
-    let editor, currentFile = "index.html";
+    function renderTree() {
+      const tree = document.getElementById("fileTree");
+      tree.innerHTML = '';
+      buildTree(treeData, tree);
+    }
 
+    function buildTree(data, parent) {
+      data.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${item.name}</span>`;
+        li.dataset.name = item.name;
+        li.dataset.type = item.type;
+        if (item.type === "folder") {
+          li.classList.add('folder');
+          const ul = document.createElement('ul');
+          li.appendChild(ul);
+        }
+        li.querySelector('span').onclick = () => {
+          if (item.type === "folder") li.classList.toggle('open');
+          else openFile(item.name);
+        };
+        parent.appendChild(li);
+      });
+    }
+
+    // Monaco
+    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs' } });
     require(['vs/editor/editor.main'], function () {
       editor = monaco.editor.create(document.getElementById('editor'), {
-        value: files[currentFile].content,
-        language: files[currentFile].language,
+        value: '',
+        language: 'html',
         theme: 'vs-dark',
         automaticLayout: true,
       });
-
       openFile('index.html');
 
+      window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 's') {
+          e.preventDefault();
+          formatCode();
+          renderPreview();
+        }
+      });
+
       editor.onDidChangeModelContent(() => {
-        files[currentFile].content = editor.getValue();
-        renderPreview();
+        if (currentFile) files[currentFile].content = editor.getValue();
       });
     });
 
     function openFile(name) {
       currentFile = name;
+      if (!files[name]) return;
       editor.setValue(files[name].content);
       monaco.editor.setModelLanguage(editor.getModel(), files[name].language);
       updateTabs();
@@ -86,43 +259,67 @@
     }
 
     function updateTabs() {
-      document.getElementById('tabs').innerHTML = '';
+      const tabs = document.getElementById("tabs");
+      tabs.innerHTML = '';
       Object.keys(files).forEach(name => {
         const btn = document.createElement('button');
         btn.textContent = name;
         btn.className = currentFile === name ? 'active' : '';
         btn.onclick = () => openFile(name);
-        document.getElementById('tabs').appendChild(btn);
-      });
-
-      // Highlight sidebar
-      document.querySelectorAll('.sidebar button').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.id === 'btn-' + currentFile) btn.classList.add('active');
+        tabs.appendChild(btn);
       });
     }
 
     function renderPreview() {
+      if (!files['index.html']) return;
       let htmlContent = files['index.html'].content;
-      let css = files['style.css'].content;
-      let js = files['script.js'].content;
+      let css = files['style.css']?.content || '';
+      let js = files['script.js']?.content || '';
 
-      const hasHead = htmlContent.includes("</head>");
-      const injection = `
-        <style>${css}</style>
-        <script>${js}<\/script>
-      `;
-
-      if (hasHead) {
+      const injection = `<style>${css}</style><script>${js}<\/script>`;
+      if (htmlContent.includes("</head>")) {
         htmlContent = htmlContent.replace("</head>", `${injection}</head>`);
-      } else if (htmlContent.includes("</body>")) {
-        htmlContent = htmlContent.replace("</body>", `${injection}</body>`);
       } else {
         htmlContent += injection;
       }
-
       document.getElementById('preview').srcdoc = htmlContent;
     }
+
+    // Format Code
+    function formatCode() {
+      const formatted = editor.getValue()
+        .replace(/></g, ">\n<")
+        .replace(/{/g, "{\n  ")
+        .replace(/}/g, "\n}")
+        .replace(/;/g, ";\n")
+        .replace(/\n\s*\n/g, '\n');
+      editor.setValue(formatted);
+      files[currentFile].content = formatted;
+    }
+
+    // Save Project as ZIP
+    async function saveProject() {
+      const folderName = prompt("Enter folder name:");
+      if (!folderName) return;
+
+      const zip = new JSZip();
+      for (const [fileName, file] of Object.entries(files)) {
+        zip.file(fileName, file.content);
+      }
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${folderName}.zip`;
+      a.click();
+    }
+
+    // Disable Right Click
+    window.addEventListener("contextmenu", e => e.preventDefault());
+
+    renderTree();
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
 </body>
+
 </html>
