@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Online IDE - Professional</title>
+  <title>Professional IDE - VS Code Style</title>
   <style>
     * {
       box-sizing: border-box;
@@ -17,74 +17,73 @@
       height: 100%;
       background: #1e1e1e;
       font-family: 'Fira Code', monospace;
-      color: #ccc;
+      color: #d4d4d4;
       overflow: hidden;
     }
 
     .navbar {
-      height: 60px;
-      background: #007acc;
-      color: white;
+      height: 50px;
+      background: #1f1f1f;
+      color: #fff;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
-      font-weight: bold;
-      font-size: 20px;
+      padding: 0 15px;
+      border-bottom: 1px solid #333;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     }
 
     .navbar button {
-      background: #fff;
-      color: #007acc;
+      background: #0e639c;
+      color: #fff;
       border: none;
-      padding: 8px 16px;
-      border-radius: 5px;
+      padding: 6px 14px;
+      border-radius: 3px;
       cursor: pointer;
       font-weight: bold;
-      transition: background 0.3s;
+      transition: background 0.3s ease;
     }
 
     .navbar button:hover {
-      background: #e0e0e0;
+      background: #1177bb;
     }
 
     .container {
       display: flex;
-      flex-wrap: wrap;
-      height: calc(100vh - 60px);
+      flex: 1;
+      height: calc(100vh - 50px);
     }
 
     .sidebar {
-      width: 250px;
+      width: 220px;
       background: #252526;
       overflow-y: auto;
       padding: 10px;
       border-right: 1px solid #333;
+      transition: 0.3s;
     }
 
     .tree {
       list-style: none;
-      padding-left: 0;
     }
 
     .tree li {
-      padding: 8px;
+      padding: 8px 10px;
       cursor: pointer;
       user-select: none;
-      position: relative;
-      border-radius: 5px;
+      border-radius: 4px;
       transition: background 0.2s;
+      font-size: 14px;
     }
 
     .tree li:hover {
-      background: #333;
+      background: #37373d;
     }
 
     .tree li.folder>span::before {
-      content: '▶';
+      content: '▸';
       display: inline-block;
       margin-right: 5px;
-      transform: rotate(0deg);
       transition: .2s;
     }
 
@@ -107,49 +106,58 @@
     }
 
     .editor-section {
-      flex: 1;
+      flex: 2;
       display: flex;
       flex-direction: column;
       background: #1e1e1e;
-      min-width: 300px;
+      min-width: 280px;
     }
 
     .tabs {
       display: flex;
       background: #2d2d2d;
+      padding-left: 5px;
+      border-bottom: 1px solid #333;
     }
 
     .tabs button {
       background: none;
       border: none;
       color: #ccc;
-      padding: 10px 15px;
+      padding: 8px 12px;
       cursor: pointer;
       border-bottom: 2px solid transparent;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .tabs button:hover {
+      background: #3c3c3c;
     }
 
     .tabs button.active {
-      border-bottom: 2px solid #007acc;
+      border-bottom: 2px solid #0e639c;
       background: #1e1e1e;
+      color: #fff;
     }
 
     .editor {
       flex: 1;
-      min-height: 250px;
     }
 
     .right-pane {
       flex: 1;
       display: flex;
       flex-direction: column;
-      min-width: 300px;
+      background: #1e1e1e;
+      min-width: 280px;
+      border-left: 1px solid #333;
     }
 
     .preview {
       flex: 1;
       border: none;
       background: #fff;
-      min-height: 250px;
     }
 
     @media(max-width: 768px) {
@@ -159,8 +167,18 @@
 
       .sidebar {
         width: 100%;
+        height: 150px;
         border-right: none;
         border-bottom: 1px solid #333;
+      }
+
+      .editor-section,
+      .right-pane {
+        min-width: 100%;
+      }
+
+      .tabs {
+        overflow-x: auto;
       }
     }
   </style>
@@ -168,7 +186,7 @@
 
 <body>
   <div class="navbar">
-    ⚡ My Professional IDE
+    ⚡ Pro IDE
     <button onclick="saveProject()">💾 Save Project</button>
   </div>
   <div class="container">
@@ -187,18 +205,18 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs/loader.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
   <script>
-    const treeData = [
-      { name: "index.html", type: "file" },
-      { name: "style.css", type: "file" },
-      { name: "script.js", type: "file" }
-    ];
-    const files = {
+    const defaultFiles = {
       "index.html": { content: "<!DOCTYPE html>\n<html>\n<head>\n  <title>Live Preview</title>\n</head>\n<body>\n  <h1>Hello World</h1>\n  <p>Edit files to see live preview!</p>\n</body>\n</html>", language: "html" },
       "style.css": { content: "body { background: #f0f0f0; color: #333; font-family: Arial; } h1 { color: steelblue; }", language: "css" },
       "script.js": { content: "document.querySelector('h1').addEventListener('click', () => alert('Hello from JS!'))", language: "javascript" }
     };
-    let editor, currentFile = null;
+    let files = JSON.parse(localStorage.getItem("ide-files")) || defaultFiles;
+    let currentFile = null;
+    let editor;
+
+    const treeData = Object.keys(files).map(file => ({ name: file, type: "file" }));
 
     function renderTree() {
       const tree = document.getElementById("fileTree");
@@ -212,20 +230,11 @@
         li.innerHTML = `<span>${item.name}</span>`;
         li.dataset.name = item.name;
         li.dataset.type = item.type;
-        if (item.type === "folder") {
-          li.classList.add('folder');
-          const ul = document.createElement('ul');
-          li.appendChild(ul);
-        }
-        li.querySelector('span').onclick = () => {
-          if (item.type === "folder") li.classList.toggle('open');
-          else openFile(item.name);
-        };
+        li.querySelector('span').onclick = () => openFile(item.name);
         parent.appendChild(li);
       });
     }
 
-    // Monaco
     require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs' } });
     require(['vs/editor/editor.main'], function () {
       editor = monaco.editor.create(document.getElementById('editor'), {
@@ -234,18 +243,22 @@
         theme: 'vs-dark',
         automaticLayout: true,
       });
-      openFile('index.html');
+      openFile(Object.keys(files)[0]);
 
       window.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.key === 's') {
           e.preventDefault();
           formatCode();
           renderPreview();
+          autoSave();
         }
       });
 
       editor.onDidChangeModelContent(() => {
-        if (currentFile) files[currentFile].content = editor.getValue();
+        if (currentFile) {
+          files[currentFile].content = editor.getValue();
+          autoSave();
+        }
       });
     });
 
@@ -285,41 +298,34 @@
       document.getElementById('preview').srcdoc = htmlContent;
     }
 
-    // Format Code
     function formatCode() {
       const formatted = editor.getValue()
         .replace(/></g, ">\n<")
         .replace(/{/g, "{\n  ")
         .replace(/}/g, "\n}")
         .replace(/;/g, ";\n")
-        .replace(/\n\s*\n/g, '\n');
+        .replace(/\n\s*\n/g, "\n");
       editor.setValue(formatted);
-      files[currentFile].content = formatted;
     }
 
-    // Save Project as ZIP
-    async function saveProject() {
-      const folderName = prompt("Enter folder name:");
-      if (!folderName) return;
-
+    function saveProject() {
       const zip = new JSZip();
-      for (const [fileName, file] of Object.entries(files)) {
-        zip.file(fileName, file.content);
-      }
-
-      const blob = await zip.generateAsync({ type: "blob" });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${folderName}.zip`;
-      a.click();
+      Object.entries(files).forEach(([name, file]) => zip.file(name, file.content));
+      const filename = prompt("Enter zip filename (default: project.zip):") || "project";
+      zip.generateAsync({ type: "blob" }).then(content => {
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(content);
+        link.download = filename.endsWith('.zip') ? filename : `${filename}.zip`;
+        link.click();
+      });
     }
 
-    // Disable Right Click
-    window.addEventListener("contextmenu", e => e.preventDefault());
+    function autoSave() {
+      localStorage.setItem("ide-files", JSON.stringify(files));
+    }
 
     renderTree();
   </script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
 </body>
 
 </html>
