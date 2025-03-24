@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pro Code Editor</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Fira Code', monospace;
+      height: 100vh;
+      display: flex;
+      background: #121212;
+      color: #e0e0e0;
+      flex-direction: column;
+    }
+
+    .main-container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: #1f1f1f;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #333;
+      resize: horizontal;
+      overflow: auto;
+      min-width: 150px;
+    }
+
+    .sidebar h2 {
+      margin: 0 0 10px;
+      font-size: 16px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .file-item {
+      padding: 8px 10px;
+      margin-bottom: 5px;
+      cursor: pointer;
+      border-radius: 5px;
+      background: #2b2b2b;
+      transition: 0.3s;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .file-item:hover {
+      background: #3a3a3a;
+    }
+
+    .file-item.active {
+      background: #007bff;
+      color: #fff;
+    }
+
+    .sidebar button {
+      margin-top: auto;
+      padding: 10px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+
+    .sidebar button:hover {
+      background: #0056b3;
+    }
+
+    .editor-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tabs {
+      background: #1a1a1a;
+      display: flex;
+      overflow-x: auto;
+      border-bottom: 1px solid #333;
+    }
+
+    .tab {
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      white-space: nowrap;
+      transition: 0.3s;
+    }
+
+    .tab.active {
+      background: #2b2b2b;
+      color: #fff;
+    }
+
+    .tab:hover {
+      background: #333;
+    }
+
+    .editor-preview {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #monaco-editor {
+      width: 50%;
+      height: 100%;
+      resize: horizontal;
+      overflow: auto;
+      min-width: 200px;
+    }
+
+    iframe {
+      width: 50%;
+      border: none;
+      background: #fff;
+    }
+
+    .status-bar {
+      height: 25px;
+      background: #1f1f1f;
+      color: #aaa;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      font-size: 12px;
+      border-top: 1px solid #333;
+      justify-content: space-between;
+    }
+
+    .context-menu {
+      display: none;
+      position: absolute;
+      background: #2b2b2b;
+      color: #fff;
+      padding: 5px;
+      border: 1px solid #444;
+      z-index: 999;
+      border-radius: 5px;
+    }
+
+    .context-menu div {
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    .context-menu div:hover {
+      background: #3a3a3a;
+    }
+
+    @media (max-width: 768px) {
+      .editor-preview {
+        flex-direction: column;
+      }
+
+      #monaco-editor,
+      iframe {
+        width: 100%;
+        height: 50%;
+      }
+    }
+  </style>
+  <!-- Monaco Editor CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+</head>
+
+<body>
+  <div class="main-container">
+    <div class="sidebar">
+      <h2>Files</h2>
+      <div id="file-list"></div>
+      <button onclick="createFile()">+ New File</button>
+    </div>
+
+    <div class="editor-container">
+      <div class="tabs" id="tabs"></div>
+      <div class="editor-preview">
+        <div id="monaco-editor"></div>
+        <iframe id="preview"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span id="status">Ready</span>
+    <span>Ctrl+S to save | Right-click file to rename/delete</span>
+  </div>
+
+  <div id="context-menu" class="context-menu">
+    <div id="rename-file">Rename</div>
+    <div id="delete-file">Delete</div>
+  </div>
+
+  <script>
+    // Load from localStorage
+    let files = JSON.parse(localStorage.getItem('files')) || {
+      "index.html": {
+        lang: "html",
+        content: "<!DOCTYPE html>\n<html>\n<head>\n<title>My Project</title>\n</head>\n<body>\n<h1>Hello World</h1>\n</body>\n</html>"
+      }
+    };
+    let currentFile = "index.html";
+    let editorInstance;
+
+    const fileList = document.getElementById("file-list");
+    const tabs = document.getElementById("tabs");
+    const preview = document.getElementById("preview");
+    const status = document.getElementById("status");
+
+    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' } });
+    require(['vs/editor/editor.main'], function () {
+      editorInstance = monaco.editor.create(document.getElementById('monaco-editor'), {
+        value: files[currentFile].content,
+        language: files[currentFile].lang,
+        theme: "vs-dark",
+        automaticLayout: true
+      });
+
+      editorInstance.onDidChangeModelContent(() => {
+        files[currentFile].content = editorInstance.getValue();
+        status.textContent = "Unsaved changes...";
+        renderPreview();
+      });
+
+      init();
+    });
+
+    function init() {
+      renderFiles();
+      renderTabs();
+    }
+
+    function renderFiles() {
+      fileList.innerHTML = "";
+      Object.keys(files).forEach(name => {
+        const div = document.createElement("div");
+        div.className = "file-item" + (name === currentFile ? " active" : "");
+        div.innerHTML = `<span>${name}</span>`;
+        div.dataset.name = name;
+        div.onclick = () => switchFile(name);
+        div.oncontextmenu = (e) => showContextMenu(e, div);
+        fileList.appendChild(div);
+      });
+      updateEditorContent();
+      renderPreview();
+    }
+
+    function renderTabs() {
+      tabs.innerHTML = "";
+      Object.keys(files).forEach(name => {
+        const tab = document.createElement("div");
+        tab.className = "tab" + (name === currentFile ? " active" : "");
+        tab.textContent = name;
+        tab.onclick = () => switchFile(name);
+        tabs.appendChild(tab);
+      });
+    }
+
+    function switchFile(name) {
+      files[currentFile].content = editorInstance.getValue();
+      currentFile = name;
+      updateEditorContent();
+      renderFiles();
+      renderTabs();
+      status.textContent = "Switched to " + name;
+    }
+
+    function updateEditorContent() {
+      monaco.editor.setModelLanguage(editorInstance.getModel(), files[currentFile].lang);
+      editorInstance.setValue(files[currentFile].content);
+    }
+
+    function createFile() {
+      const name = prompt("Enter file name (e.g., style.css or script.js):");
+      if (!name || files[name]) return;
+      files[name] = { lang: getLanguage(name), content: "" };
+      switchFile(name);
+      saveToStorage();
+    }
+
+    function getLanguage(name) {
+      if (name.endsWith(".html")) return "html";
+      if (name.endsWith(".css")) return "css";
+      if (name.endsWith(".js")) return "javascript";
+      return "plaintext";
+    }
+
+    function renderPreview() {
+      if (currentFile.endsWith(".html")) {
+        let css = "", js = "";
+        Object.keys(files).forEach(name => {
+          if (name.endsWith(".css")) css += files[name].content + "\n";
+          if (name.endsWith(".js")) js += files[name].content + "\n";
+        });
+
+        let html = files[currentFile].content;
+        const headCloseTag = html.indexOf("</head>") !== -1 ? "</head>" : "<body>";
+        const cssTag = `<style>${css}</style>`;
+        const jsTag = `<script>${js}<\/script>`;
+        html = html.replace(headCloseTag, cssTag + jsTag + headCloseTag);
+        preview.srcdoc = html;
+      }
+    }
+
+    function showContextMenu(e, element) {
+      e.preventDefault();
+      const contextMenu = document.getElementById("context-menu");
+      contextMenu.style.display = "block";
+      contextMenu.style.left = `${e.pageX}px`;
+      contextMenu.style.top = `${e.pageY}px`;
+
+      const deleteFile = document.getElementById("delete-file");
+      const renameFile = document.getElementById("rename-file");
+
+      deleteFile.onclick = () => deleteFileAction(element);
+      renameFile.onclick = () => renameFileAction(element);
+    }
+
+    function deleteFileAction(element) {
+      const name = element.dataset.name;
+      if (confirm(`Are you sure you want to delete ${name}?`)) {
+        delete files[name];
+        if (currentFile === name) {
+          switchFile(Object.keys(files)[0]);
+        } else {
+          renderFiles();
+          renderTabs();
+        }
+        saveToStorage();
+      }
+    }
+
+    function renameFileAction(element) {
+      const name = element.dataset.name;
+      const newName = prompt("Enter new name:", name);
+      if (newName && !files[newName]) {
+        files[newName] = files[name];
+        delete files[name];
+        switchFile(newName);
+        saveToStorage();
+      }
+    }
+
+    document.addEventListener("click", () => {
+      document.getElementById("context-menu").style.display = "none";
+    });
+
+    function saveToStorage() {
+      localStorage.setItem("files", JSON.stringify(files));
+    }
+  </script>
+</body>
+
+</html>
